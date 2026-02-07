@@ -28,7 +28,12 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-app.use(cors());
+app.use(cors({
+  origin: '*', // Allow all origins (or replace with specific frontend URL)
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+// app.use(cors());
 app.use(express.json());
 app.use('/images', express.static('images'));
 
