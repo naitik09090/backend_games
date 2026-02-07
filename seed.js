@@ -37,7 +37,7 @@ const seedData = [
 
 const seedDatabase = async () => {
   try {
-    await mongoose.connect(process.env.MongoDBConn);
+    await mongoose.connect(process.env.MONGODBCON);
     console.log('Connected to MongoDB');
 
     await Game.deleteMany(); // Clear existing data

@@ -32,7 +32,7 @@ app.use(cors());
 app.use(express.json());
 app.use('/images', express.static('images'));
 
-mongoose.connect(process.env.MongoDBConn)
+mongoose.connect(process.env.MONGODBCON)
   .then(() => console.log('Connected to MongoDB'))
   .catch(err => console.error('MongoDB connection error:', err));
 
