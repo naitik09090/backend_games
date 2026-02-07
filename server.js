@@ -36,11 +36,11 @@ mongoose.connect(process.env.MONGODBCON)
   .then(() => console.log('Connected to MongoDB'))
   .catch(err => console.error('MongoDB connection error:', err));
 
-app.get('/', (req, res) => {
-  res.send('Hello World');
-})
+// app.get('/', (req, res) => {
+//   res.send('Hello World');
+// })
 
-app.get('/gm_games', async (req, res) => {
+app.get('/', async (req, res) => {
   try {
     let query = GMGame.find({});
 
