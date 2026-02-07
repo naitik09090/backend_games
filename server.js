@@ -36,9 +36,9 @@ mongoose.connect(process.env.MONGODBCON)
   .then(() => console.log('Connected to MongoDB'))
   .catch(err => console.error('MongoDB connection error:', err));
 
-// app.get('/', (req, res) => {
-//   res.send('Hello World');
-// })
+app.get('/', (req, res) => {
+  res.send('Hello World');
+})
 
 app.get('/gm_games', async (req, res) => {
   try {
@@ -76,7 +76,7 @@ app.get('/gm_games/:id', async (req, res) => {
 });
 
 // Create a new gm_game
-app.post('/', upload.single('gameLogo'), async (req, res) => {
+app.post('/gm_games', upload.single('gameLogo'), async (req, res) => {
   try {
     const gameData = {
       game_name: req.body.gameName,
