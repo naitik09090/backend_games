@@ -9,10 +9,13 @@ import User from './model/userModel.js';
 import GMGame from './model/gmGameModel.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { fileURLToPath } from 'url';
 
 dotenv.config();
 
 const app = express();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const PORT = process.env.PORT || 8000;
 
@@ -30,7 +33,7 @@ const upload = multer({ storage: storage });
 
 app.use(cors());
 app.use(express.json());
-app.use('/images', express.static('images'));
+app.use('/images', express.static(path.join(__dirname, 'images')));
 
 mongoose.connect(process.env.MONGODBCON)
   .then(() => console.log('Connected to MongoDB'))
@@ -158,71 +161,50 @@ app.patch('/gm_games/:id/toggle-status', async (req, res) => {
 
 app.get('/games', async (req, res) => {
   try {
-    const page = parseInt(req.query.page);
-    const limit = parseInt(req.query.limit);
-
-    // If no pagination provided, return all from both (legacy/fallback)
-    // Or just fetch all if page/limit are missing
-    if (!page || !limit) {
-      const [localGames, gmGames] = await Promise.all([
-        Game.find().sort({ createdAt: -1 }),
-        GMGame.find().sort({ _id: -1 })
-      ]);
-
-      const formattedGmGames = gmGames.map(g => ({
-        _id: g._id,
-        gameName: g.name || g.game_name,
-        gameLogo: g.image,
-        gameUrl: g.file,
-        iframs: g.file ? [g.file] : [],
-        source: 'gm_games'
-      }));
-
-      return res.json([...localGames, ...formattedGmGames]);
-    }
-
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
-    const gameCount = await Game.countDocuments();
 
-    let combinedGames = [];
-    let remainingLimit = limit;
+    const games = await Game.aggregate([
+      // 1. Project local games to match standard format
+      {
+        $project: {
+          _id: 1,
+          gameName: 1,
+          gameLogo: 1,
+          gameUrl: 1,
+          iframs: 1,
+          status: 1,
+          createdAt: 1,
+          source: { $literal: 'local' }
+        }
+      },
+      // 2. Union with gm_games collection
+      {
+        $unionWith: {
+          coll: 'gm_games',
+          pipeline: [
+            {
+              $project: {
+                _id: 1,
+                gameName: { $ifNull: ["$name", "$game_name"] },
+                gameLogo: "$image",
+                gameUrl: "$file",
+                iframs: { $cond: { if: { $gt: [{ $type: "$file" }, "missing"] }, then: ["$file"], else: [] } },
+                status: { $literal: true },
+                createdAt: { $ifNull: ["$createdAt", "$_id"] }, // Fallback for sorting
+                source: { $literal: 'gm_games' }
+              }
+            }
+          ]
+        }
+      },
+      { $sort: { createdAt: -1 } },
+      { $skip: skip },
+      { $limit: limit }
+    ]);
 
-    // 1. Fetch from local Game collection
-    if (skip < gameCount) {
-      const localGames = await Game.find()
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(remainingLimit);
-
-      combinedGames = [...localGames];
-      remainingLimit -= localGames.length;
-    }
-
-    // 2. Fetch from GMGame collection if we still need items
-    if (remainingLimit > 0) {
-      // Calculate skip for GMGame
-      // If we skipped everything in Game (skip >= gameCount), efficient skip in GM is (skip - gameCount)
-      // If we partially fetched Game, we start GM from 0
-      const gmSkip = skip >= gameCount ? skip - gameCount : 0;
-
-      const gmGames = await GMGame.find()
-        .sort({ _id: -1 })
-        .skip(gmSkip)
-        .limit(remainingLimit);
-
-      const formattedGmGames = gmGames.map(g => ({
-        _id: g._id,
-        gameName: g.name || g.game_name,
-        gameLogo: g.image,
-        gameUrl: g.file,
-        iframs: g.file ? [g.file] : [],
-        source: 'gm_games'
-      }));
-
-      combinedGames = [...combinedGames, ...formattedGmGames];
-    }
-
-    res.json(combinedGames);
+    res.json(games);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -412,3 +394,5 @@ app.post('/login', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
+
+export default app;
