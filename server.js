@@ -40,7 +40,7 @@ mongoose.connect(process.env.MONGODBCON)
 //   res.send('Hello World');
 // })
 
-app.get('/', async (req, res) => {
+app.get('/gm_games', async (req, res) => {
   try {
     let query = GMGame.find({});
 
@@ -76,7 +76,7 @@ app.get('/gm_games/:id', async (req, res) => {
 });
 
 // Create a new gm_game
-app.post('/gm_games', upload.single('gameLogo'), async (req, res) => {
+app.post('/', upload.single('gameLogo'), async (req, res) => {
   try {
     const gameData = {
       game_name: req.body.gameName,
