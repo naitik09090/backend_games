@@ -40,7 +40,9 @@ app.use(cors({
 app.use(express.json());
 app.use('/images', express.static(path.join(__dirname, 'images')));
 
-mongoose.connect(process.env.MONGODBCON)
+mongoose.connect(process.env.MONGODBCON, {
+  serverSelectionTimeoutMS: 5000 // Timeout after 5s instead of hanging
+})
   .then(() => console.log('Connected to MongoDB'))
   .catch(err => console.error('MongoDB connection error:', err));
 
