@@ -58,138 +58,138 @@ app.get('/', (req, res) => {
 })
 
 // Stats endpoint for dashboard
-app.get('/stats', async (req, res) => {
-  try {
-    const gamesCount = await Game.countDocuments();
-    const gmGamesCount = await GMGame.countDocuments();
-    const totalGames = gamesCount + gmGamesCount;
+// app.get('/stats', async (req, res) => {
+//   try {
+//     const gamesCount = await Game.countDocuments();
+//     const gmGamesCount = await GMGame.countDocuments();
+//     const totalGames = gamesCount + gmGamesCount;
 
-    res.json({
-      totalGames,
-      gamesCount,
-      gmGamesCount
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+//     res.json({
+//       totalGames,
+//       gamesCount,
+//       gmGamesCount
+//     });
+//   } catch (err) {
+//     res.status(500).json({ error: err.message });
+//   }
+// });
 
 
-app.get('/gm_games', async (req, res) => {
-  try {
-    let query = GMGame.find({});
+// app.get('/gm_games', async (req, res) => {
+//   try {
+//     let query = GMGame.find({});
 
-    // Check if pagination parameters are provided
-    if (req.query.page && req.query.limit) {
-      const page = parseInt(req.query.page);
-      const limit = parseInt(req.query.limit);
+//     // Check if pagination parameters are provided
+//     if (req.query.page && req.query.limit) {
+//       const page = parseInt(req.query.page);
+//       const limit = parseInt(req.query.limit);
 
-      if (!isNaN(page) && !isNaN(limit) && page > 0 && limit > 0) {
-        const skip = (page - 1) * limit;
-        query = query.skip(skip).limit(limit);
-      }
-    }
+//       if (!isNaN(page) && !isNaN(limit) && page > 0 && limit > 0) {
+//         const skip = (page - 1) * limit;
+//         query = query.skip(skip).limit(limit);
+//       }
+//     }
 
-    const games = await query;
-    res.json(games);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+//     const games = await query;
+//     res.json(games);
+//   } catch (err) {
+//     res.status(500).json({ error: err.message });
+//   }
+// });
 
-app.get('/gm_games/:id', async (req, res) => {
-  try {
-    const gameId = req.params.id.trim();
-    const game = await GMGame.findById(gameId);
-    if (!game) {
-      return res.status(404).json({ error: 'Game not found' });
-    }
-    res.json(game);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+// app.get('/gm_games/:id', async (req, res) => {
+//   try {
+//     const gameId = req.params.id.trim();
+//     const game = await GMGame.findById(gameId);
+//     if (!game) {
+//       return res.status(404).json({ error: 'Game not found' });
+//     }
+//     res.json(game);
+//   } catch (err) {
+//     res.status(500).json({ error: err.message });
+//   }
+// });
 
-// Create a new gm_game
-app.post('/gm_games', upload.single('gameLogo'), async (req, res) => {
-  try {
-    const gameData = {
-      game_name: req.body.gameName,
-      name: req.body.gameName,
-      image: req.file ? `/images/${req.file.filename}` : req.body.gameLogo,
-      file: req.body.gameUrl || req.body.iframs,
-      status: true,
-      published: 1
-    };
-    const newGame = new GMGame(gameData);
-    await newGame.save();
-    res.status(201).json(newGame);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
+// // Create a new gm_game
+// app.post('/gm_games', upload.single('gameLogo'), async (req, res) => {
+//   try {
+//     const gameData = {
+//       game_name: req.body.gameName,
+//       name: req.body.gameName,
+//       image: req.file ? `/images/${req.file.filename}` : req.body.gameLogo,
+//       file: req.body.gameUrl || req.body.iframs,
+//       status: true,
+//       published: 1
+//     };
+//     const newGame = new GMGame(gameData);
+//     await newGame.save();
+//     res.status(201).json(newGame);
+//   } catch (err) {
+//     res.status(400).json({ error: err.message });
+//   }
+// });
 
-// Update a gm_game by ID
-app.put('/gm_games/:id', upload.single('gameLogo'), async (req, res) => {
-  try {
-    const { id } = req.params;
-    const existingGame = await GMGame.findById(id);
+// // Update a gm_game by ID
+// app.put('/gm_games/:id', upload.single('gameLogo'), async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const existingGame = await GMGame.findById(id);
 
-    if (!existingGame) {
-      return res.status(404).json({ error: 'Game not found' });
-    }
+//     if (!existingGame) {
+//       return res.status(404).json({ error: 'Game not found' });
+//     }
 
-    // Update fields if provided
-    if (req.body.gameName) {
-      existingGame.game_name = req.body.gameName;
-      existingGame.name = req.body.gameName;
-    }
-    if (req.body.gameUrl || req.body.iframs) {
-      existingGame.file = req.body.gameUrl || req.body.iframs;
-    }
+//     // Update fields if provided
+//     if (req.body.gameName) {
+//       existingGame.game_name = req.body.gameName;
+//       existingGame.name = req.body.gameName;
+//     }
+//     if (req.body.gameUrl || req.body.iframs) {
+//       existingGame.file = req.body.gameUrl || req.body.iframs;
+//     }
 
-    // Handle image update
-    if (req.file) {
-      existingGame.image = `/images/${req.file.filename}`;
-    } else if (req.body.gameLogo) {
-      existingGame.image = req.body.gameLogo;
-    }
+//     // Handle image update
+//     if (req.file) {
+//       existingGame.image = `/images/${req.file.filename}`;
+//     } else if (req.body.gameLogo) {
+//       existingGame.image = req.body.gameLogo;
+//     }
 
-    const updatedGame = await existingGame.save();
-    res.json(updatedGame);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
+//     const updatedGame = await existingGame.save();
+//     res.json(updatedGame);
+//   } catch (err) {
+//     res.status(400).json({ error: err.message });
+//   }
+// });
 
-// Delete a gm_game by ID
-app.delete('/gm_games/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const deletedGame = await GMGame.findByIdAndDelete(id);
-    if (!deletedGame) {
-      return res.status(404).json({ error: 'Game not found' });
-    }
-    res.json({ message: 'Game deleted successfully' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+// // Delete a gm_game by ID
+// app.delete('/gm_games/:id', async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const deletedGame = await GMGame.findByIdAndDelete(id);
+//     if (!deletedGame) {
+//       return res.status(404).json({ error: 'Game not found' });
+//     }
+//     res.json({ message: 'Game deleted successfully' });
+//   } catch (err) {
+//     res.status(500).json({ error: err.message });
+//   }
+// });
 
-// Toggle gm_game status (Active/Inactive)
-app.patch('/gm_games/:id/toggle-status', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const game = await GMGame.findById(id);
-    if (!game) return res.status(404).json({ error: 'Game not found' });
+// // Toggle gm_game status (Active/Inactive)
+// app.patch('/gm_games/:id/toggle-status', async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const game = await GMGame.findById(id);
+//     if (!game) return res.status(404).json({ error: 'Game not found' });
 
-    game.status = !game.status;
-    await game.save();
-    res.json({ message: 'Status updated', status: game.status });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+//     game.status = !game.status;
+//     await game.save();
+//     res.json({ message: 'Status updated', status: game.status });
+//   } catch (err) {
+//     res.status(500).json({ error: err.message });
+//   }
+// });
 
 app.get('/games', async (req, res) => {
   try {
@@ -197,26 +197,29 @@ app.get('/games', async (req, res) => {
     const limit = parseInt(req.query.limit) || 50;
     const skip = (page - 1) * limit;
 
-    // Get total count first
-    const gamesCount = await Game.countDocuments();
-    const gmGamesCount = await GMGame.countDocuments();
-    const totalGames = gamesCount + gmGamesCount;
+    // Get total count first - ONLY local games
+    const totalGames = await Game.countDocuments();
+    // const gmGamesCount = await GMGame.countDocuments();
+    // const totalGames = gamesCount + gmGamesCount;
 
     // Start with GMGame as it contains the bulk of the data (25k+ records)
     // This allows the join to work even if the local 'games' collection is empty.
+
+    // COMMENTED OUT GM_GAMES AGGREGATION
+    /*
     const games = await GMGame.aggregate([
-      {
-        $project: {
-          _id: 1,
-          gameName: { $ifNull: ["$name", "$game_name"] },
-          gameLogo: "$image",
-          gameUrl: "$file",
-          iframs: { $ifNull: ["$file", ""] },
-          status: { $literal: true },
-          createdAt: { $ifNull: ["$createdAt", { $toDate: "$_id" }] },
-          source: { $literal: 'gm_games' }
-        }
-      },
+      // {
+      //   $project: {
+      //     _id: 1,
+      //     gameName: { $ifNull: ["$name", "$game_name"] },
+      //     gameLogo: "$image",
+      //     gameUrl: "$file",
+      //     iframs: { $ifNull: ["$file", ""] },
+      //     status: { $literal: true },
+      //     createdAt: { $ifNull: ["$createdAt", { $toDate: "$_id" }] },
+      //     source: { $literal: 'gm_games' }
+      //   }
+      // },
       {
         $unionWith: {
           coll: 'games',
@@ -236,10 +239,17 @@ app.get('/games', async (req, res) => {
           ]
         }
       },
-      { $sort: { createdAt: -1 } },
-      { $skip: skip },
-      { $limit: limit }
+      // { $sort: { createdAt: -1 } },
+      // { $skip: skip },
+      // { $limit: limit }
     ]);
+    */
+
+    // NEW LOGIC: ONLY FETCH LOCAL GAMES
+    const games = await Game.find()
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
 
     const totalPages = Math.ceil(totalGames / limit);
     const hasMore = page < totalPages;
