@@ -287,10 +287,22 @@ app.get('/api/health', async (req, res) => {
   try {
     const dbStatus = mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected';
     const gamesCount = await Game.countDocuments();
+    const dbName = mongoose.connection.db ? mongoose.connection.db.databaseName : 'Not connected';
+    const collectionName = Game.collection.name;
+
+    // Get all collections
+    let collections = [];
+    if (mongoose.connection.db) {
+      const cols = await mongoose.connection.db.listCollections().toArray();
+      collections = cols.map(c => c.name);
+    }
 
     res.json({
       status: 'OK',
       database: dbStatus,
+      databaseName: dbName,
+      collectionName: collectionName,
+      allCollections: collections,
       gamesCount: gamesCount,
       hasMongoDBConnection: !!process.env.MONGODBCON,
       mongoDBConnectionString: process.env.MONGODBCON ? 'Set (hidden for security)' : 'NOT SET',
