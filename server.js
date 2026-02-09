@@ -282,6 +282,30 @@ app.get('/', (req, res) => {
   res.send('Hello World');
 })
 
+// Health check endpoint to verify environment variables and DB connection
+app.get('/api/health', async (req, res) => {
+  try {
+    const dbStatus = mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected';
+    const gamesCount = await Game.countDocuments();
+
+    res.json({
+      status: 'OK',
+      database: dbStatus,
+      gamesCount: gamesCount,
+      hasMongoDBConnection: !!process.env.MONGODBCON,
+      mongoDBConnectionString: process.env.MONGODBCON ? 'Set (hidden for security)' : 'NOT SET',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'ERROR',
+      error: error.message,
+      hasMongoDBConnection: !!process.env.MONGODBCON,
+      mongoDBConnectionString: process.env.MONGODBCON ? 'Set (hidden for security)' : 'NOT SET'
+    });
+  }
+})
+
 app.get('/gm_games', async (req, res) => {
   try {
     let query = GMGame.find({});
