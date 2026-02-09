@@ -400,71 +400,22 @@ app.patch('/gm_games/:id/toggle-status', async (req, res) => {
 
 app.get('/games', async (req, res) => {
   try {
-    const page = parseInt(req.query.page);
-    const limit = parseInt(req.query.limit);
-
-    // If no pagination provided, return all from both (legacy/fallback)
-    // Or just fetch all if page/limit are missing
-    if (!page || !limit) {
-      const [localGames, gmGames] = await Promise.all([
-        Game.find().sort({ createdAt: -1 }),
-        GMGame.find().sort({ _id: -1 })
-      ]);
-
-      const formattedGmGames = gmGames.map(g => ({
-        _id: g._id,
-        gameName: g.name || g.game_name,
-        gameLogo: g.image,
-        gameUrl: g.file,
-        iframs: g.file ? [g.file] : [],
-        source: 'gm_games'
-      }));
-
-      return res.json([...localGames, ...formattedGmGames]);
-    }
-
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
     const skip = (page - 1) * limit;
-    const gameCount = await Game.countDocuments();
 
-    let combinedGames = [];
-    let remainingLimit = limit;
+    const games = await Game.find({})
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
 
-    // 1. Fetch from local Game collection
-    if (skip < gameCount) {
-      const localGames = await Game.find()
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(remainingLimit);
+    // Add source tag for frontend compatibility
+    const gamesWithSource = games.map(game => ({
+      ...game.toObject(),
+      source: 'local'
+    }));
 
-      combinedGames = [...localGames];
-      remainingLimit -= localGames.length;
-    }
-
-    // 2. Fetch from GMGame collection if we still need items
-    if (remainingLimit > 0) {
-      // Calculate skip for GMGame
-      // If we skipped everything in Game (skip >= gameCount), efficient skip in GM is (skip - gameCount)
-      // If we partially fetched Game, we start GM from 0
-      const gmSkip = skip >= gameCount ? skip - gameCount : 0;
-
-      const gmGames = await GMGame.find()
-        .sort({ _id: -1 })
-        .skip(gmSkip)
-        .limit(remainingLimit);
-
-      const formattedGmGames = gmGames.map(g => ({
-        _id: g._id,
-        gameName: g.name || g.game_name,
-        gameLogo: g.image,
-        gameUrl: g.file,
-        iframs: g.file ? [g.file] : [],
-        source: 'gm_games'
-      }));
-
-      combinedGames = [...combinedGames, ...formattedGmGames];
-    }
-
-    res.json(combinedGames);
+    res.json(gamesWithSource);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
