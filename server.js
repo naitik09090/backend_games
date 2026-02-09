@@ -197,6 +197,11 @@ app.get('/games', async (req, res) => {
     const limit = parseInt(req.query.limit) || 50;
     const skip = (page - 1) * limit;
 
+    // Get total count first
+    const gamesCount = await Game.countDocuments();
+    const gmGamesCount = await GMGame.countDocuments();
+    const totalGames = gamesCount + gmGamesCount;
+
     // Start with GMGame as it contains the bulk of the data (25k+ records)
     // This allows the join to work even if the local 'games' collection is empty.
     const games = await GMGame.aggregate([
@@ -236,9 +241,19 @@ app.get('/games', async (req, res) => {
       { $limit: limit }
     ]);
 
+    const totalPages = Math.ceil(totalGames / limit);
+    const hasMore = page < totalPages;
+
     res.json({
-      total: games.length,
-      games: games
+      games: games,
+      pagination: {
+        currentPage: page,
+        limit: limit,
+        totalGames: totalGames,
+        totalPages: totalPages,
+        hasMore: hasMore,
+        nextPage: hasMore ? page + 1 : null
+      }
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
