@@ -57,6 +57,23 @@ app.get('/', (req, res) => {
   res.send('Hello World');
 })
 
+// Stats endpoint for dashboard
+app.get('/stats', async (req, res) => {
+  try {
+    const gamesCount = await Game.countDocuments();
+    const gmGamesCount = await GMGame.countDocuments();
+    const totalGames = gamesCount + gmGamesCount;
+
+    res.json({
+      totalGames,
+      gamesCount,
+      gmGamesCount
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 app.get('/gm_games', async (req, res) => {
   try {
@@ -219,11 +236,62 @@ app.get('/games', async (req, res) => {
       { $limit: limit }
     ]);
 
-    res.json(games);
+    res.json({
+      total: games.length,
+      games: games
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
+
+// New endpoint to get ALL games from both collections together
+// app.get('/all-games', async (req, res) => {
+//   try {
+//     // Combine both collections using aggregation
+//     const allGames = await GMGame.aggregate([
+//       {
+//         $project: {
+//           _id: 1,
+//           gameName: { $ifNull: ["$name", "$game_name"] },
+//           gameLogo: "$image",
+//           gameUrl: "$file",
+//           iframs: { $ifNull: ["$file", ""] },
+//           status: { $literal: true },
+//           createdAt: { $ifNull: ["$createdAt", { $toDate: "$_id" }] },
+//           source: { $literal: 'gm_games' }
+//         }
+//       },
+//       {
+//         $unionWith: {
+//           coll: 'games',
+//           pipeline: [
+//             {
+//               $project: {
+//                 _id: 1,
+//                 gameName: 1,
+//                 gameLogo: 1,
+//                 gameUrl: 1,
+//                 iframs: { $ifNull: [{ $arrayElemAt: ["$iframs", 0] }, "$gameUrl"] },
+//                 status: 1,
+//                 createdAt: { $ifNull: ["$createdAt", { $toDate: "$_id" }] },
+//                 source: { $literal: 'local' }
+//               }
+//             }
+//           ]
+//         }
+//       },
+//       { $sort: { createdAt: -1 } }
+//     ]);
+
+//     res.json({
+//       total: allGames.length,
+//       games: allGames
+//     });
+//   } catch (err) {
+//     res.status(500).json({ error: err.message });
+//   }
+// });
 
 app.get('/games/:id', async (req, res) => {
   try {
