@@ -404,18 +404,46 @@ app.get('/games', async (req, res) => {
     const limit = parseInt(req.query.limit) || 50;
     const skip = (page - 1) * limit;
 
-    const games = await Game.find({})
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
+    // Start with GMGame as it contains the bulk of the data (25k+ records)
+    // This allows the join to work even if the local 'games' collection is empty.
+    const games = await GMGame.aggregate([
+      {
+        $project: {
+          _id: 1,
+          gameName: { $ifNull: ["$name", "$game_name"] },
+          gameLogo: "$image",
+          gameUrl: "$file",
+          iframs: { $ifNull: ["$file", ""] },
+          status: { $literal: true },
+          createdAt: { $ifNull: ["$createdAt", { $toDate: "$_id" }] },
+          source: { $literal: 'gm_games' }
+        }
+      },
+      {
+        $unionWith: {
+          coll: 'games',
+          pipeline: [
+            {
+              $project: {
+                _id: 1,
+                gameName: 1,
+                gameLogo: 1,
+                gameUrl: 1,
+                iframs: { $ifNull: [{ $arrayElemAt: ["$iframs", 0] }, "$gameUrl"] },
+                status: 1,
+                createdAt: { $ifNull: ["$createdAt", { $toDate: "$_id" }] },
+                source: { $literal: 'local' }
+              }
+            }
+          ]
+        }
+      },
+      { $sort: { createdAt: -1 } },
+      { $skip: skip },
+      { $limit: limit }
+    ]);
 
-    // Add source tag for frontend compatibility
-    const gamesWithSource = games.map(game => ({
-      ...game.toObject(),
-      source: 'local'
-    }));
-
-    res.json(gamesWithSource);
+    res.json(games);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
