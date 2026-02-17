@@ -36,7 +36,10 @@ app.use('/images', express.static('images'));
 let isMongoConnected = false;
 
 async function connectToMongo() {
-  if (isMongoConnected) return;
+  if (mongoose.connection.readyState >= 1) {
+    isMongoConnected = true;
+    return;
+  }
 
   try {
     await mongoose.connect(process.env.MONGODBCON);
@@ -44,14 +47,17 @@ async function connectToMongo() {
     isMongoConnected = true;
   } catch (err) {
     console.error('MongoDB connection error:', err);
+    throw err;
   }
 }
 
-app.use((req, res, next) => {
-  if (!isMongoConnected) {
-    connectToMongo();
+app.use(async (req, res, next) => {
+  try {
+    await connectToMongo();
+    next();
+  } catch (err) {
+    res.status(500).json({ error: 'Database connection failed' });
   }
-  next();
 });
 
 app.get('/', (req, res) => {
