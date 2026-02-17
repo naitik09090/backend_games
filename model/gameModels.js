@@ -9,7 +9,8 @@ const gameSchema = new mongoose.Schema({
     gameLogo: {
         type: String,
         required: true,
-        trim: true
+        trim: true,
+        set: (v) => v.replace(/[\r\n]+/g, '')
     },
     gameUrl: {
         type: String,
