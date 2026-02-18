@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="bg-grad" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+      <stop offset="0%" style="stop-color:#1e293b;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#020617;stop-opacity:1" />
+    </radialGradient>
+    <linearGradient id="tile-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#22d3ee;stop-opacity:0.8" />
+      <stop offset="100%" style="stop-color:#818cf8;stop-opacity:0.4" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+    <filter id="neon-text" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur in="SourceAlpha" stdDeviation="3" result="blur"/>
+        <feOffset dx="0" dy="0" result="offsetBlur"/>
+        <feFlood flood-color="#e879f9" result="color"/>
+        <feComposite in="color" in2="offsetBlur" operator="in" result="shadow"/>
+        <feMerge>
+            <feMergeNode in="shadow"/>
+            <feMergeNode in="SourceGraphic"/>
+        </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" fill="url(#bg-grad)" />
+
+  <!-- Grid Pattern Overlay -->
+  <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#334155" stroke-width="1" opacity="0.3"/>
+  </pattern>
+  <rect width="512" height="512" fill="url(#grid)" />
+
+  <!-- 3D Perspective Container -->
+  <g transform="translate(256, 256) rotate(0)">
+    
+    <!-- Central Grid Background -->
+    <rect x="-160" y="-160" width="320" height="320" rx="40" fill="#0f172a" stroke="#334155" stroke-width="4" />
+
+    <!-- Tiles Layout (3x3 shown + gap) -->
+    <g id="tiles">
+        <!-- Row 1 -->
+        <rect x="-140" y="-140" width="80" height="80" rx="16" fill="url(#tile-grad)" stroke="#22d3ee" stroke-width="2" />
+        <rect x="-40" y="-140" width="80" height="80" rx="16" fill="url(#tile-grad)" stroke="#22d3ee" stroke-width="2" />
+        <rect x="60" y="-140" width="80" height="80" rx="16" fill="url(#tile-grad)" stroke="#22d3ee" stroke-width="2" />
+        
+        <!-- Row 2 -->
+        <rect x="-140" y="-40" width="80" height="80" rx="16" fill="url(#tile-grad)" stroke="#22d3ee" stroke-width="2" />
+        <rect x="-40" y="-40" width="80" height="80" rx="16" fill="#e879f9" fill-opacity="0.2" stroke="#e879f9" stroke-width="2" filter="url(#glow)">
+            <animate attributeName="opacity" values="0.6;1;0.6" dur="2s" repeatCount="indefinite" />
+        </rect>
+        <rect x="60" y="-40" width="80" height="80" rx="16" fill="url(#tile-grad)" stroke="#22d3ee" stroke-width="2" />
+
+        <!-- Row 3 -->
+        <rect x="-140" y="60" width="80" height="80" rx="16" fill="url(#tile-grad)" stroke="#22d3ee" stroke-width="2" />
+        <rect x="-40" y="60" width="80" height="80" rx="16" fill="url(#tile-grad)" stroke="#22d3ee" stroke-width="2" />
+        <!-- Bottom Right Gap -->
+    </g>
+    
+    <!-- Floating "15" Text -->
+    <text x="0" y="200" text-anchor="middle" font-family="Arial, sans-serif" font-weight="900" font-size="64" fill="#fff" filter="url(#neon-text)" letter-spacing="4">FIFTY</text>
+    <text x="0" y="230" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#94a3b8" letter-spacing="8">PUZZLE SYSTEM</text>
+  </g>
+
+</svg>
