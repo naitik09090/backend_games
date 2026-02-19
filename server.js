@@ -15,7 +15,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Ensure images directory exists on startup
+// Ensure images directory exists on startup (keep for backward compatibility or local dev)
 const imagesDir = path.join(__dirname, 'images');
 if (!fs.existsSync(imagesDir)) {
   fs.mkdirSync(imagesDir);
@@ -27,90 +27,23 @@ const app = express();
 
 const PORT = process.env.PORT || 8000;
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    // Ensure images directory exists on each request just in case
-    const imagesRecheck = path.join(__dirname, 'images');
-    if (!fs.existsSync(imagesRecheck)) {
-      fs.mkdirSync(imagesRecheck);
-    }
-    cb(null, imagesRecheck);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-
-    // Get extension from original name
-    let ext = path.extname(file.originalname);
-
-    // If no extension found, try to determine from mime type
-    if (!ext || ext === '.') {
-      const mimeToExt = {
-        'image/jpeg': '.jpg',
-        'image/png': '.png',
-        'image/gif': '.gif',
-        'image/webp': '.webp',
-        'image/svg+xml': '.svg',
-        'image/x-icon': '.ico',
-        'image/vnd.microsoft.icon': '.ico'
-      };
-      ext = mimeToExt[file.mimetype] || '.jpg'; // transform to .jpg as fallback
-    }
-
-    cb(null, uniqueSuffix + ext);
-  }
-});
+// Use Memory Storage to store files as Buffer, then convert to Base64
+const storage = multer.memoryStorage();
 
 const upload = multer({ storage: storage });
 
-// cleaned up imports block from previous step
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Debug logging for image requests
 app.use('/images', (req, res, next) => {
-  // console.log(`Request for image: ${req.url}`);
   next();
 });
 
 app.use('/images', express.static(path.join(__dirname, 'images')));
 
-/* Helper function to convert base64 to image file */
-const convertBase64ToImage = (base64Data) => {
-  try {
-    // Check if it's base64 data
-    if (!base64Data || typeof base64Data !== 'string' || !base64Data.startsWith('data:image')) {
-      return null;
-    }
-
-    const matches = base64Data.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-    if (!matches || matches.length !== 3) {
-      return null;
-    }
-
-    const type = matches[1];
-    const buffer = Buffer.from(matches[2], 'base64');
-    let extension = type.split('/')[1] || 'png';
-    // Fix common extension issues
-    if (extension === 'svg+xml') extension = 'svg';
-    if (extension === 'jpeg') extension = 'jpg';
-    if (extension === 'x-icon') extension = 'ico';
-    if (extension === 'vnd.microsoft.icon') extension = 'ico';
-    const filename = `${Date.now()}-${Math.round(Math.random() * 1E9)}.${extension}`;
-
-    // Ensure images directory exists
-    const imagesDir = path.join(__dirname, 'images');
-    if (!fs.existsSync(imagesDir)) {
-      fs.mkdirSync(imagesDir);
-    }
-
-    fs.writeFileSync(path.join(imagesDir, filename), buffer);
-    return `/images/${filename}`;
-  } catch (error) {
-    console.error('Error converting base64 to image:', error);
-    return null;
-  }
-};
+/* Helper function is no longer needed for conversion, but we keep the static serving for old files */
 
 let isMongoConnected = false;
 
@@ -332,24 +265,14 @@ app.get('/games', async (req, res) => {
     */
 
     // NEW LOGIC: ONLY FETCH LOCAL GAMES
-    let games = await Game.find()
+    const games = await Game.find()
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
 
-    // Lazy migration: Convert any base64 images to files
-    const updatedGames = await Promise.all(games.map(async (game) => {
-      if (game.gameLogo && game.gameLogo.startsWith('data:image')) {
-        const newPath = convertBase64ToImage(game.gameLogo);
-        if (newPath) {
-          game.gameLogo = newPath;
-          await game.save();
-        }
-      }
-      return game;
-    }));
-
-    games = updatedGames;
+    // REMOVED: Lazy migration that converted Base64 to files. 
+    // This was causing issues on Vercel where files would disappear.
+    // Now we serve Base64 directly from DB.
 
     const totalPages = Math.ceil(totalGames / limit);
     const hasMore = page < totalPages;
@@ -453,11 +376,25 @@ app.get('/games/:id', async (req, res) => {
   }
 });
 
+const processImageUpload = (file) => {
+  if (!file) return null;
+  const b64 = Buffer.from(file.buffer).toString('base64');
+  let mimeType = file.mimetype;
+  return `data:${mimeType};base64,${b64}`;
+}
+
 app.post('/games', upload.single('gameLogo'), async (req, res) => {
   try {
+    let gameLogo = req.body.gameLogo;
+
+    // If a file is uploaded, convert to base64
+    if (req.file) {
+      gameLogo = processImageUpload(req.file);
+    }
+
     const gameData = {
       gameName: req.body.gameName,
-      gameLogo: req.file ? `/images/${req.file.filename}` : (convertBase64ToImage(req.body.gameLogo) || req.body.gameLogo),
+      gameLogo: gameLogo,
       gameUrl: req.body.gameUrl,
       iframs: req.body.iframs ? req.body.iframs.split(',').map(url => url.trim()) : []
     };
@@ -485,9 +422,9 @@ app.put('/games/:id', upload.single('gameLogo'), async (req, res) => {
 
     // Handle gameLogo update
     if (req.file) {
-      existingGame.gameLogo = `/images/${req.file.filename}`;
+      existingGame.gameLogo = processImageUpload(req.file);
     } else if (req.body.gameLogo) {
-      existingGame.gameLogo = convertBase64ToImage(req.body.gameLogo) || req.body.gameLogo;
+      existingGame.gameLogo = req.body.gameLogo;
     }
 
     // Handle iframs update
