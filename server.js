@@ -1,4 +1,5 @@
 import express from 'express';
+import sharp from 'sharp';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import cors from 'cors';
@@ -30,7 +31,13 @@ const PORT = process.env.PORT || 8000;
 // Use Memory Storage to store files as Buffer, then convert to Base64
 const storage = multer.memoryStorage();
 
-const upload = multer({ storage: storage });
+const upload = multer({
+  storage: storage,
+  limits: {
+    fieldSize: 10 * 1024 * 1024, // 10 MB max per field (safety net)
+    fileSize: 10 * 1024 * 1024,  // 10 MB max per file
+  }
+});
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
@@ -376,20 +383,34 @@ app.get('/games/:id', async (req, res) => {
   }
 });
 
-const processImageUpload = (file) => {
+const processImageUpload = async (file) => {
   if (!file) return null;
-  const b64 = Buffer.from(file.buffer).toString('base64');
-  let mimeType = file.mimetype;
-  return `data:${mimeType};base64,${b64}`;
+
+  try {
+    // Resize to 400x400 (cover crop) and convert to WebP at 80% quality
+    // This turns a 1MB+ PNG/GIF/ICO into a ~20-50KB WebP thumbnail
+    const webpBuffer = await sharp(file.buffer)
+      .resize(400, 400, { fit: 'cover', position: 'centre' })
+      .webp({ quality: 80 })
+      .toBuffer();
+
+    const b64 = webpBuffer.toString('base64');
+    return `data:image/webp;base64,${b64}`;
+  } catch (err) {
+    // Fallback: if sharp fails (e.g. unsupported format), store original
+    console.warn('sharp processing failed, storing original:', err.message);
+    const b64 = Buffer.from(file.buffer).toString('base64');
+    return `data:${file.mimetype};base64,${b64}`;
+  }
 }
 
 app.post('/games', upload.single('gameLogo'), async (req, res) => {
   try {
     let gameLogo = req.body.gameLogo;
 
-    // If a file is uploaded, convert to base64
+    // If a file is uploaded, resize + convert to WebP base64
     if (req.file) {
-      gameLogo = processImageUpload(req.file);
+      gameLogo = await processImageUpload(req.file);
     }
 
     const gameData = {
@@ -422,7 +443,7 @@ app.put('/games/:id', upload.single('gameLogo'), async (req, res) => {
 
     // Handle gameLogo update
     if (req.file) {
-      existingGame.gameLogo = processImageUpload(req.file);
+      existingGame.gameLogo = await processImageUpload(req.file);
     } else if (req.body.gameLogo) {
       existingGame.gameLogo = req.body.gameLogo;
     }
