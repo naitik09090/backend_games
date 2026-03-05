@@ -52,6 +52,42 @@ app.use('/images', express.static(path.join(__dirname, 'images')));
 
 /* Helper function is no longer needed for conversion, but we keep the static serving for old files */
 
+// ─── Image Proxy Endpoint ───────────────────────────────────────────────────
+// Fetches any image URL, resizes to 370x370 WebP, and serves with cache headers.
+// This fixes Lighthouse "Use modern image formats" and "Properly size images" audits
+// for legacy game logos stored as raw .gif / .png / .ico / .jpg URLs.
+app.get('/image-proxy', async (req, res) => {
+  const imageUrl = req.query.url;
+  if (!imageUrl) return res.status(400).send('Missing ?url parameter');
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const response = await fetch(imageUrl, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (!response.ok) throw new Error(`Upstream responded ${response.status}`);
+
+    const arrayBuffer = await response.arrayBuffer();
+    const inputBuffer = Buffer.from(arrayBuffer);
+
+    const webpBuffer = await sharp(inputBuffer)
+      .resize(370, 370, { fit: 'cover', position: 'centre' })
+      .webp({ quality: 82 })
+      .toBuffer();
+
+    res.set({
+      'Content-Type': 'image/webp',
+      'Cache-Control': 'public, max-age=31536000, immutable', // 1 year
+      'Vary': 'Accept-Encoding',
+    });
+    res.send(webpBuffer);
+  } catch (err) {
+    console.error('image-proxy error:', err.message);
+    // Fall back: redirect to the original URL so the image still loads
+    res.redirect(imageUrl);
+  }
+});
+
 let isMongoConnected = false;
 
 async function connectToMongo() {
