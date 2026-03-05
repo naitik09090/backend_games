@@ -60,6 +60,9 @@ app.get('/image-proxy', async (req, res) => {
   const imageUrl = req.query.url;
   if (!imageUrl) return res.status(400).send('Missing ?url parameter');
 
+  // ?w= lets the client request the exact size: 185 for 1x, 370 for 2x (retina)
+  const requestedSize = Math.min(Math.max(parseInt(req.query.w) || 185, 32), 800);
+
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
@@ -71,7 +74,7 @@ app.get('/image-proxy', async (req, res) => {
     const inputBuffer = Buffer.from(arrayBuffer);
 
     const webpBuffer = await sharp(inputBuffer)
-      .resize(370, 370, { fit: 'cover', position: 'centre' })
+      .resize(requestedSize, requestedSize, { fit: 'cover', position: 'centre' })
       .webp({ quality: 82 })
       .toBuffer();
 
