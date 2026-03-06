@@ -343,7 +343,7 @@ app.get('/games', async (req, res) => {
 app.get('/games/:id/logo', async (req, res) => {
   try {
     const gameId = req.params.id.trim();
-    const requestedSize = Math.min(Math.max(parseInt(req.query.w) || 185, 32), 480);
+    const requestedSize = Math.min(Math.max(parseInt(req.query.w) || 185, 32), 330);
 
     const game = await Game.findById(gameId, { gameLogo: 1 });
     if (!game || !game.gameLogo) {
