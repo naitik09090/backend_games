@@ -264,61 +264,13 @@ app.get('/games', async (req, res) => {
 
     // Get total count first - ONLY local games
     const totalGames = await Game.countDocuments();
-    // const gmGamesCount = await GMGame.countDocuments();
-    // const totalGames = gamesCount + gmGamesCount;
 
-    // Start with GMGame as it contains the bulk of the data (25k+ records)
-    // This allows the join to work even if the local 'games' collection is empty.
-
-    // COMMENTED OUT GM_GAMES AGGREGATION
-    /*
-    const games = await GMGame.aggregate([
-      // {
-      //   $project: {
-      //     _id: 1,
-      //     gameName: { $ifNull: ["$name", "$game_name"] },
-      //     gameLogo: "$image",
-      //     gameUrl: "$file",
-      //     iframs: { $ifNull: ["$file", ""] },
-      //     status: { $literal: true },
-      //     createdAt: { $ifNull: ["$createdAt", { $toDate: "$_id" }] },
-      //     source: { $literal: 'gm_games' }
-      //   }
-      // },
-      {
-        $unionWith: {
-          coll: 'games',
-          pipeline: [
-            {
-              $project: {
-                _id: 1,
-                gameName: 1,
-                gameLogo: 1,
-                gameUrl: 1,
-                iframs: { $ifNull: [{ $arrayElemAt: ["$iframs", 0] }, "$gameUrl"] },
-                status: 1,
-                createdAt: { $ifNull: ["$createdAt", { $toDate: "$_id" }] },
-                source: { $literal: 'local' }
-              }
-            }
-          ]
-        }
-      },
-      // { $sort: { createdAt: -1 } },
-      // { $skip: skip },
-      // { $limit: limit }
-    ]);
-    */
-
-    // NEW LOGIC: ONLY FETCH LOCAL GAMES
-    const games = await Game.find()
+    // Exclude gameLogo (base64 blob) from the list response to keep payload small.
+    // The frontend uses /games/:id/logo to fetch thumbnails on demand.
+    const games = await Game.find({}, { gameName: 1, gameUrl: 1, iframs: 1, status: 1, createdAt: 1 })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
-
-    // REMOVED: Lazy migration that converted Base64 to files. 
-    // This was causing issues on Vercel where files would disappear.
-    // Now we serve Base64 directly from DB.
 
     const totalPages = Math.ceil(totalGames / limit);
     const hasMore = page < totalPages;
@@ -386,6 +338,56 @@ app.get('/games', async (req, res) => {
 //     res.status(500).json({ error: err.message });
 //   }
 // });
+
+// Serve a game's logo as a resized WebP image (avoids sending raw base64 in API responses)
+app.get('/games/:id/logo', async (req, res) => {
+  try {
+    const gameId = req.params.id.trim();
+    const requestedSize = Math.min(Math.max(parseInt(req.query.w) || 185, 32), 800);
+
+    const game = await Game.findById(gameId, { gameLogo: 1 });
+    if (!game || !game.gameLogo) {
+      return res.status(404).send('Logo not found');
+    }
+
+    const logo = game.gameLogo;
+    let inputBuffer;
+
+    if (logo.startsWith('data:')) {
+      // Case 1: base64 data URI (new uploads processed by sharp on upload)
+      const base64Data = logo.replace(/^data:image\/\w+;base64,/, '');
+      inputBuffer = Buffer.from(base64Data, 'base64');
+    } else if (logo.startsWith('http://') || logo.startsWith('https://')) {
+      // Case 2: external URL — fetch and pipe through sharp
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const response = await fetch(logo, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (!response.ok) throw new Error(`Upstream responded ${response.status}`);
+      const arrayBuffer = await response.arrayBuffer();
+      inputBuffer = Buffer.from(arrayBuffer);
+    } else {
+      // Case 3: relative path like /images/foo.png — read from local filesystem
+      const localPath = path.join(__dirname, logo.startsWith('/') ? logo.slice(1) : logo);
+      inputBuffer = fs.readFileSync(localPath);
+    }
+
+    const webpBuffer = await sharp(inputBuffer)
+      .resize(requestedSize, requestedSize, { fit: 'cover', position: 'centre' })
+      .webp({ quality: 82 })
+      .toBuffer();
+
+    res.set({
+      'Content-Type': 'image/webp',
+      'Cache-Control': 'public, max-age=31536000, immutable', // 1 year cache
+      'Vary': 'Accept-Encoding',
+    });
+    res.send(webpBuffer);
+  } catch (err) {
+    console.error('logo endpoint error:', err.message);
+    res.status(500).send('Error processing logo');
+  }
+});
 
 app.get('/games/:id', async (req, res) => {
   try {
