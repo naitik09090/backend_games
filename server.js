@@ -343,7 +343,7 @@ app.get('/games', async (req, res) => {
 app.get('/games/:id/logo', async (req, res) => {
   try {
     const gameId = req.params.id.trim();
-    const requestedSize = Math.min(Math.max(parseInt(req.query.w) || 185, 32), 800);
+    const requestedSize = Math.min(Math.max(parseInt(req.query.w) || 185, 32), 480);
 
     const game = await Game.findById(gameId, { gameLogo: 1 });
     if (!game || !game.gameLogo) {
@@ -428,10 +428,11 @@ const processImageUpload = async (file) => {
   if (!file) return null;
 
   try {
-    // Resize to 400x400 (cover crop) and convert to WebP at 80% quality
-    // This turns a 1MB+ PNG/GIF/ICO into a ~20-50KB WebP thumbnail
+    // Resize to 500x500 (cover crop) and convert to WebP at 80% quality.
+    // 500px gives us headroom to downscale cleanly to 480px (desktop 2x) without upscaling.
+    // This turns a 1MB+ PNG/GIF/ICO into a ~25-60KB WebP thumbnail.
     const webpBuffer = await sharp(file.buffer)
-      .resize(400, 400, { fit: 'cover', position: 'centre' })
+      .resize(500, 500, { fit: 'cover', position: 'centre' })
       .webp({ quality: 80 })
       .toBuffer();
 
